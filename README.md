@@ -11,14 +11,14 @@
 - Discord webhook
 
 ### After pull, we need create files:
-__credentials.json__ (credentials app desktop of gmail api)
-__credentials.py__
+* __credentials.json__ (credentials app desktop of gmail api)
+* __credentials.py__
 ```python
 KEY_NOTION = ""
 DATABASE_ID_NOTION  = ""
 WEBHOOK_TOKEN_DISCORD = ""
 ```
-__dictionaries.py__ (**user** of notion and **user id** of discord)
+* __dictionaries.py__ (**user** of notion and **user id** of discord)
 ```python
 user_dict = {
     "Trung": "612976675583688710"
