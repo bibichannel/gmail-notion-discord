@@ -1,15 +1,6 @@
 import requests
 import random
-
-"""
-1. Connect to Notion data
-    - Created a Notion integration key
-    - Save key in my_secrets.py file
-    - Allow the Notion Integration key to access the page we want to share
-2. Connect to Discord
-3. Push data to Discord 
-"""
-
+import pickle
 
 class Notion:
     base_url = "https://api.notion.com/v1/databases/"
@@ -47,7 +38,18 @@ class Notion:
             results.extend(data["results"])
 
         return results
+    
+    def save_data_to_file(self, filePath, object):
+        with open(filePath, 'wb') as f:
+            pickle.dump(object, f) 
+        print("Save successed")
 
+    def get_data_from_file(self, filePath):
+        with open(filePath, 'rb') as f:
+            object = pickle.load(f)
+        print("Get successed")    
+        return object
+        
     def dictionary_decoder(self, response):
         return [i for i in response]
 
@@ -59,12 +61,12 @@ class PropertiesNotion(Notion):
 
     def __init__(self):
         self.id = random.randint(5000, 5500)
-        
+        self.assign = []
         self.ticket = ""
         self.note = ""
         self.link = ""
         self.owner = ""
-        self.assign = []
+        self.status = ""
 
     def __del__(self):
         self.assign = []
@@ -72,6 +74,7 @@ class PropertiesNotion(Notion):
         self.note = ""
         self.link = ""
         self.owner = ""
+        self.status = ""
         print("Delete object successed")
 
     def check_ticket_assgin(self, response, ticket):
@@ -90,14 +93,34 @@ class PropertiesNotion(Notion):
                 if pages["properties"]["Owner"]["select"] is not None:
                     self.owner = pages["properties"]["Owner"]["select"]["name"]
 
+                if pages["properties"]["Status"]["status"] is not None:
+                    self.status = pages["properties"]["Status"]["status"]["name"]
+
                 if pages["properties"]['Assignee']['multi_select'] != []:
                     for j in range(len(pages["properties"]["Assignee"]["multi_select"])):
                         assign_user = pages["properties"]["Assignee"]["multi_select"][j]["name"]
                         self.assign.append(assign_user)
+
                 return True
         return False
-
+        
 # --------------------------------------------------------------
 
+def data_normalize_by_status(response, status_name):
+    new_data_dict = {}
+
+    for element in response:
+        if element["properties"]["Ticket"]["title"] != []:
+            ticket = element["properties"]["Ticket"]["title"][0]["plain_text"]
+        else:
+            continue
+
+        if element["properties"]["Status"]["status"] is not None:
+            if status_name in element["properties"]["Status"]["status"]["name"]:
+                new_data_dict[ticket] = element["properties"]["Status"]["status"]["name"]
+        else:
+            continue
+    
+    return new_data_dict
 
 query = {"filter": {"property": "Ticket", "exists": True}}

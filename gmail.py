@@ -64,11 +64,6 @@ def reconstruct_unread_message_list(services, message_list):
                 break
     return new_message_list
 
-# def get_message_subject(message_list, message_id):
-#     for message in message_list:
-#         if message['id'] == message_id :
-#             return message['subject']
-
 def get_ticket(message_subject):
     matches = re.findall(r'\b(?:AST|JIRA|\*AST)\b', message_subject, flags=re.IGNORECASE)
     if not matches:
