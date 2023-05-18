@@ -1,6 +1,5 @@
 import requests
 import random
-import credentials
 
 """
 1. Connect to Notion data

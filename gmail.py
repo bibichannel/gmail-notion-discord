@@ -15,7 +15,7 @@ from googleapiclient.errors import HttpError
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']
 
-async def gmail_authenticate():
+def gmail_authenticate():
 
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -28,7 +28,7 @@ async def gmail_authenticate():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                '.\credentials.json', SCOPES)
+                './credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
@@ -42,7 +42,7 @@ async def gmail_authenticate():
         print(f'An error occurred: {error}')
         return None
 
-async def get_message_unread(services):
+def get_message_unread(services):
     results = services.users().messages().list(userId='me', labelIds='INBOX', q="is:unread").execute()
     message_list = results.get('messages', [])
     
@@ -51,7 +51,7 @@ async def get_message_unread(services):
     else:
         return message_list
 
-async def reconstruct_unread_message_list(services, message_list):
+def reconstruct_unread_message_list(services, message_list):
     new_message_list = []
 
     for message in message_list:
@@ -64,21 +64,21 @@ async def reconstruct_unread_message_list(services, message_list):
                 break
     return new_message_list
 
-async def get_message_subject(message_list, message_id):
-    for message in message_list:
-        if message['id'] == message_id :
-            return message['subject']
+# def get_message_subject(message_list, message_id):
+#     for message in message_list:
+#         if message['id'] == message_id :
+#             return message['subject']
 
-async def get_ticket(message_subject):
+def get_ticket(message_subject):
     matches = re.findall(r'\b(?:AST|JIRA|\*AST)\b', message_subject, flags=re.IGNORECASE)
     if not matches:
         return None
     # Get elements
     return re.search(r'\b(?:AST|JIRA|\*AST)-\d+\b', message_subject, flags=re.IGNORECASE).group()
 
-async def move_to_label(services, message_id, label_name):
+def move_to_label(services, message_id, label_name):
     try:
-        # search id of  label
+        # search id of "Jira" label
         labels = services.users().labels().list(userId='me').execute().get('labels', [])
         label_id = None
         for label in labels:
@@ -86,20 +86,20 @@ async def move_to_label(services, message_id, label_name):
                 label_id = label['id']
                 break
 
-        # move email to label
+        # move email to "Jira" label
         if label_id:
             message = services.users().messages().modify(
                 userId='me',
                 id=message_id,
                 body={'addLabelIds': [label_id], 'removeLabelIds': ['INBOX']}
             ).execute()
-            print(f"Message {message_id} moved to Jira label.")
+            print(f"Message {message_id} moved to {label_name} label.")
         else:
             print(f"{label_name} label not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
-async def mark_as_read(services, message_id):
+def mark_as_read(services, message_id):
     try:
         message = services.users().messages().modify(
             userId='me',

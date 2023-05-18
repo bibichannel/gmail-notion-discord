@@ -2,6 +2,5 @@ credentials.py
 credentials.json
 token.json
 dictionaries.py
-dictionaries.py
 /venv
 /__pycache__
