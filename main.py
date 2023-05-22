@@ -20,7 +20,5 @@ def processing():
 
 if __name__ == '__main__':
     print("Start")
-    while True:
-        processing()
-        time.sleep(180)
+    processing()
     
