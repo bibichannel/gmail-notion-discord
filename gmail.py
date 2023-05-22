@@ -5,7 +5,6 @@ from __future__ import print_function
 
 import os.path
 import re
-import time
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -51,6 +50,7 @@ def get_message_unread(services):
     else:
         return message_list
 
+# reconstruct to list with elements: [<messages_id>,<email_subject>;]
 def reconstruct_unread_message_list(services, message_list):
     new_message_list = []
 
@@ -65,15 +65,20 @@ def reconstruct_unread_message_list(services, message_list):
     return new_message_list
 
 def get_ticket(message_subject):
-    matches = re.findall(r'\b(?:AST|JIRA|\*AST)\b', message_subject, flags=re.IGNORECASE)
+    matches = re.findall(r'\b(?:AST|JIRA)\b', message_subject, flags=re.IGNORECASE)
     if not matches:
         return None
+    
     # Get elements
-    return re.search(r'\b(?:AST|JIRA|\*AST)-\d+\b', message_subject, flags=re.IGNORECASE).group()
+    result = re.search(r'\b(?:AST|JIRA)-\d+\b', message_subject, flags=re.IGNORECASE)
+    if result:
+        return result.group()
+    else:
+        return None
 
 def move_to_label(services, message_id, label_name):
     try:
-        # search id of "Jira" label
+        # search id of label
         labels = services.users().labels().list(userId='me').execute().get('labels', [])
         label_id = None
         for label in labels:
@@ -81,7 +86,7 @@ def move_to_label(services, message_id, label_name):
                 label_id = label['id']
                 break
 
-        # move email to "Jira" label
+        # move email to label
         if label_id:
             message = services.users().messages().modify(
                 userId='me',

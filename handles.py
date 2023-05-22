@@ -2,7 +2,6 @@ import requests
 import dictionaries
 import credentials
 import notion
-from notion import Notion
 from notion import PropertiesNotion
 import gmail
 import os
@@ -66,7 +65,7 @@ def handle_notification_from_email(response):
         if ticket is not None:  
             print(ticket)
             print("-----------------------------")
-            gmail.move_to_label(services, messsage['id'], 'Astrolab')
+            gmail.move_to_label(services, messsage['id'], credentials.NAME_LABEL_GMAIL)
             gmail.mark_as_read(services, messsage['id'])
         
             object = PropertiesNotion()
@@ -90,24 +89,25 @@ def handle_in_progress_status(response):
     print("Processing notification from 'In progress' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response, "In progress")
+    path_file = r'.\storage\in_progress.pickle'
 
     # Check file exist
-    if not os.path.exists('.\storage\in_progress.pickle'):
+    if not os.path.exists(path_file):
         print("File in_progress.pickle not exist. Processcing save data to file")
-        save_data_to_file(".\storage\in_progress.pickle", new_normalize)
+        save_data_to_file(path_file, new_normalize)
         return True
 
     # Get data from file
-    pre_normalize = get_data_from_file(".\storage\in_progress.pickle")
+    pre_normalize = get_data_from_file(path_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\nTicket {key} has changed to: {value} \nHave a good time at work!\n"
+            messages = f"\n----------------------------------\n({key}) ---> {value} \nHave a good time at work!\n"
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
-    save_data_to_file(".\storage\in_progress.pickle", new_normalize)
+    save_data_to_file(path_file, new_normalize)
    
 
 def handle_waiting_for_pr_review_status(response):
@@ -115,44 +115,47 @@ def handle_waiting_for_pr_review_status(response):
 
     # Get data from notion database
     new_normalize = notion.data_normalize_by_status(response, "Waiting for PR Review")
+    path_file = r'.\storage\waiting_for_pr_review.pickle'
 
     # Check file exist
-    if not os.path.exists('.\storage\waiting_for_pr_review.pickle'):
+    if not os.path.exists(path_file):
         print("File waiting_for_pr_review.pickle not exist. Processcing save data to file")
-        save_data_to_file(".\storage\waiting_for_pr_review.pickle", new_normalize)
+        save_data_to_file(path_file, new_normalize)
         return True
 
     # Get data from file
-    pre_normalize = get_data_from_file(".\storage\waiting_for_pr_review.pickle")
+    pre_normalize = get_data_from_file(path_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\nTicket ({key}) has changed to: {value} \nPlease review: <@{612976675583688710}>\n"
+            messages = f"\n----------------------------------\n({key}) ---> {value} \nPlease review: <@{612976675583688710}>\n"
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
-    save_data_to_file(".\storage\waiting_for_pr_review.pickle", new_normalize)
+    save_data_to_file(path_file, new_normalize)
 
 def handle_notion_status_blocked(response):
     print("Processing notification from 'Blocked' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response, "Blocked")
 
+    path_file = r'.\storage\blocked.pickle'
+
     # Check file exist
-    if not os.path.exists('.\storage\Blocked.pickle'):
+    if not os.path.exists(path_file):
         print("File Blocked.pickle not exist. Processcing save data to file")
-        save_data_to_file(".\storage\Blocked.pickle", new_normalize)
+        save_data_to_file(path_file, new_normalize)
         return True
 
     # Get data from file
-    pre_normalize = get_data_from_file(".\storage\Blocked.pickle")
+    pre_normalize = get_data_from_file(path_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\nTicket {key} has changed to: {value} \nOmg \\U0001F625 \\U0001F625 \\U0001F625. help me!!!\n"
+            messages = f"\n----------------------------------\n({key}) ---> {value} \nOh my god. Help me!!!\n"
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
-    save_data_to_file(".\storage\Blocked.pickle", new_normalize)
+    save_data_to_file(path_file, new_normalize)
