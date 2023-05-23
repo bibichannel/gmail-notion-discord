@@ -123,4 +123,4 @@ def data_normalize_by_status(response, status_name):
     
     return new_data_dict
 
-query = {"filter": {"property": "Ticket", "exists": True}}
+query = {"filter": {}}

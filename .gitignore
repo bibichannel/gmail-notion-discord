@@ -5,3 +5,4 @@ dictionaries.py
 /venv
 /__pycache__
 storage/*
+.vscode
