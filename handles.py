@@ -1,11 +1,12 @@
+import os
+import pickle
 import requests
 import dictionaries
 import credentials
-import notion
-from notion import PropertiesNotion
-import gmail
-import os
-import pickle
+
+import src.notion as notion
+import src.gmail as gmail
+from src.notion import PropertiesNotion
 
 def get_id_member_in_directories(username):
     user_dict = dictionaries.user_dict
@@ -75,9 +76,16 @@ def handle_notification_from_email(response):
             if object.check_ticket_assgin(response, ticket):
                 message_mention_assignee =  mention_owner(object.assign)
                 link = object.link.replace('*', '\\*')
-                messages = f"\n----------------------------------\n[JIRA] ({object.ticket}):\n- Owner: {object.owner}\n- Link: <{link}>\n- Assign: {message_mention_assignee}\n- {object.note}\n"
+                messages = f"\n----------------------------------\n" \
+                + f"[JIRA] ({object.ticket}):\n" \
+                + f"- Owner: {object.owner}\n" \
+                + f"- Link: <{link}>\n" \
+                + f"- Assign: {message_mention_assignee}\n" \
+                + f"- {object.note}\n"
             else:
-                messages = f"\n----------------------------------\nNew ticket {ticket}\n <@{694732284116598797}> <@{361429367932583938}>\n"
+                messages = f"\n----------------------------------\n" \
+                + f"New ticket {ticket}\n" \
+                + f" <@{694732284116598797}> <@{361429367932583938}>\n"
 
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
@@ -89,7 +97,7 @@ def handle_in_progress_status(response):
     print("Processing notification from 'In progress' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response, "In progress")
-    path_file = r'.\storage\in_progress.pickle'
+    path_file = r'..\storage\in_progress.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -103,7 +111,10 @@ def handle_in_progress_status(response):
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\n({key}) ---> {value} \nHave a good time at work!\n"
+            messages = f"\n----------------------------------\n" \
+            + f"({key}) ---> {value} \n" \
+            + "Have a good time at work!\n"
+            
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
@@ -115,7 +126,7 @@ def handle_waiting_for_pr_review_status(response):
 
     # Get data from notion database
     new_normalize = notion.data_normalize_by_status(response, "Waiting for PR Review")
-    path_file = r'.\storage\waiting_for_pr_review.pickle'
+    path_file = r'..\storage\waiting_for_pr_review.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -129,7 +140,10 @@ def handle_waiting_for_pr_review_status(response):
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\n({key}) ---> {value} \nPlease review: <@{612976675583688710}>\n"
+            messages = f"\n----------------------------------\n" \
+            + "({key}) ---> {value} \n" \
+            + "Please review: <@{612976675583688710}>\n"
+
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
@@ -140,7 +154,7 @@ def handle_notion_status_blocked(response):
 
     new_normalize = notion.data_normalize_by_status(response, "Blocked")
 
-    path_file = r'.\storage\blocked.pickle'
+    path_file = r'..\storage\blocked.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -154,7 +168,10 @@ def handle_notion_status_blocked(response):
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
-            messages = f"\n----------------------------------\n({key}) ---> {value} \nOh my god. Help me!!!\n"
+            messages = f"\n----------------------------------\n" \
+            + "({key}) ---> {value} \n" \
+            + "Oh my god. Help me!!!\n"
+
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 

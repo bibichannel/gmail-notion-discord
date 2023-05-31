@@ -1,7 +1,7 @@
 ## Code integrated gmail + notion + discord
 ### Flow
 1. Get the subject of new email with conditions we want
-2. Read subject ->  filter email -> move to label -> read the email (with my conditons __Ticket__)
+2. Read subject -> filter email -> move to label (with my conditons __Ticket__)
 3. With a ticket we can check in database of notion 
 4. Generate message we want and send to discord via webhook and mention to the member
 

@@ -1,9 +1,9 @@
 import handles
 import time
 import credentials
-from notion import Notion
+from src.notion import Notion
 
-def processing():
+def processing_1():
     # Notion
     while True:
         noti = Notion(credentials.DATABASE_ID_NOTION, credentials.KEY_NOTION)
@@ -20,5 +20,4 @@ def processing():
 
 if __name__ == '__main__':
     print("Start")
-    processing()
-    
+    processing_1()
