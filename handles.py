@@ -62,6 +62,7 @@ def create_page(data: dict, DATABASE_ID, NOTION_TOKEN):
     res = requests.post(create_url, headers=headers, json=payload)
     print(f"Status code: {res.status_code}")
 
+    return res.json()
 
 def handle_notification_from_email(response):
     print("Handles notification from email...")
@@ -104,28 +105,38 @@ def handle_notification_from_email(response):
                 + f"- {object.note}\n"
             else:
                 if ticket in list_ticket:
-                    continue                
+                    continue
 
-                messages = f"\n----------------------------------\n" \
-                + f"New ticket {ticket}\n" \
-                + "I created a ticket on the notion, go there and update (^-^)" \
-                + f" <@{612976675583688710}> <@{612976675583688710}>\n"
-
+                # Create payload to add item into notion database
                 data = {
                     "Ticket": {"title": [{ "text": {"content": ticket}}]},
                     "Note": {"rich_text": [{"text": {"content": "This is the new ticket, update please!"}}]},
-                    "Status": {"status": {"name": "Todo"} },
+                    "Status": {"status": {"name": "Not started"}},
                 }
                 # Create new page for notion
                 print("Add item to database notion")
-                create_page(data, credentials.DATABASE_ID_NOTION, credentials.KEY_NOTION)                
+                res = create_page(data, credentials.DATABASE_ID_NOTION, credentials.KEY_NOTION)
+
+                if 400 not in res.values():
+                    # Create message to sent to discord
+                    messages = f"\n----------------------------------\n" \
+                    + f"[NEW TICKET] {ticket}\n" \
+                    + "(^-^) Notion ticket created, please update! (^-^)\n" \
+                    + f"- Link ticket: {res['properties']['Link']['formula']['string']}\n" \
+                    + f"- Link notion: {res['url']}" \
+                    + f"\n<@{612976675583688710}> <@{612976675583688710}>\n"
+                else:
+                    messages = f"\n----------------------------------\n" \
+                    + f"[NEW TICKET] {ticket}\n" \
+                    + "[ERROR] Auto ticket creation on Notion is faulty\n" \
+                    + f"- {res['message']}" \
+                    + f"\n<@{612976675583688710}> <@{612976675583688710}>\n"
                 
             if ticket not in list_ticket:
                 list_ticket[ticket] = messages  
 
         else:
-            print("-----------------------------")
-            print("Get ticket fuction return None")
+            print("----------------------------------")
     
     # Sent message to discord
     print("\nStarting sent message...")
@@ -134,9 +145,7 @@ def handle_notification_from_email(response):
         time.sleep(3)
         print("Done")
     
-    print("Sent message success!")
-
-        
+    print("Sent message success!\n")
 
 def handle_in_progress_status(response):
     print("Processing notification from 'In progress' status of notion...")
