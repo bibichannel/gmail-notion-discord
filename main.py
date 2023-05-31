@@ -9,7 +9,7 @@ def processing_1():
         noti = Notion(credentials.DATABASE_ID_NOTION, credentials.KEY_NOTION)
         response =  noti.post()
 
-        #handles.handle_notification_from_email(response)
+        handles.handle_notification_from_email(response)
         time.sleep(10)
         handles.handle_in_progress_status(response)
         time.sleep(10)

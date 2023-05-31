@@ -3,6 +3,7 @@ import pickle
 import requests
 import dictionaries
 import credentials
+import time
 
 import src.notion as notion
 import src.gmail as gmail
@@ -48,6 +49,20 @@ def get_data_from_file(filePath):
     print("Get successed")    
     return object
 
+def create_page(data: dict, DATABASE_ID, NOTION_TOKEN):
+    create_url = "https://api.notion.com/v1/pages"
+
+    headers = {
+        "Authorization": NOTION_TOKEN,
+        "Notion-Version": "2022-06-28"
+        }
+
+    payload = {"parent": {"database_id": DATABASE_ID}, "properties": data}
+
+    res = requests.post(create_url, headers=headers, json=payload)
+    print(f"Status code: {res.status_code}")
+
+
 def handle_notification_from_email(response):
     print("Handles notification from email...")
 
@@ -59,23 +74,28 @@ def handle_notification_from_email(response):
         return False
     message_list_reconstruct =  gmail.reconstruct_unread_message_list(services, message_list)
 
+    list_ticket = {}
+
     for messsage in message_list_reconstruct:
         subject =  messsage['subject']
         ticket =  gmail.get_ticket(subject)
-
-        if ticket is not None:  
+        
+        if ticket is not None:
+            print("-----------------------------")  
             print(ticket)
-            print("-----------------------------")
+
             gmail.move_to_label(services, messsage['id'], credentials.NAME_LABEL_GMAIL)
             gmail.mark_as_read(services, messsage['id'])
-        
+
             object = PropertiesNotion()
             print(f"ID object: {object.id}")
+
             messages = ""
 
             if object.check_ticket_assgin(response, ticket):
                 message_mention_assignee =  mention_owner(object.assign)
                 link = object.link.replace('*', '\\*')
+
                 messages = f"\n----------------------------------\n" \
                 + f"[JIRA] ({object.ticket}):\n" \
                 + f"- Owner: {object.owner}\n" \
@@ -83,21 +103,46 @@ def handle_notification_from_email(response):
                 + f"- Assign: {message_mention_assignee}\n" \
                 + f"- {object.note}\n"
             else:
+                if ticket in list_ticket:
+                    continue                
+
                 messages = f"\n----------------------------------\n" \
                 + f"New ticket {ticket}\n" \
-                + f" <@{694732284116598797}> <@{361429367932583938}>\n"
+                + "I created a ticket on the notion, go there and update (^-^)" \
+                + f" <@{612976675583688710}> <@{612976675583688710}>\n"
 
-            send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
+                data = {
+                    "Ticket": {"title": [{ "text": {"content": ticket}}]},
+                    "Note": {"rich_text": [{"text": {"content": "This is the new ticket, update please!"}}]},
+                    "Status": {"status": {"name": "Todo"} },
+                }
+                # Create new page for notion
+                print("Add item to database notion")
+                create_page(data, credentials.DATABASE_ID_NOTION, credentials.KEY_NOTION)                
+                
+            if ticket not in list_ticket:
+                list_ticket[ticket] = messages  
 
         else:
+            print("-----------------------------")
             print("Get ticket fuction return None")
+    
+    # Sent message to discord
+    print("\nStarting sent message...")
+    for messages in list_ticket.values():
+        send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
+        time.sleep(3)
+        print("Done")
+    
+    print("Sent message success!")
+
         
 
 def handle_in_progress_status(response):
     print("Processing notification from 'In progress' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response, "In progress")
-    path_file = r'..\storage\in_progress.pickle'
+    path_file = r'.\storage\in_progress.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -114,7 +159,7 @@ def handle_in_progress_status(response):
             messages = f"\n----------------------------------\n" \
             + f"({key}) ---> {value} \n" \
             + "Have a good time at work!\n"
-            
+
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
     # Save data for again process 
@@ -126,7 +171,7 @@ def handle_waiting_for_pr_review_status(response):
 
     # Get data from notion database
     new_normalize = notion.data_normalize_by_status(response, "Waiting for PR Review")
-    path_file = r'..\storage\waiting_for_pr_review.pickle'
+    path_file = r'.\storage\waiting_for_pr_review.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -141,8 +186,8 @@ def handle_waiting_for_pr_review_status(response):
     for key, value in new_normalize.items():
         if key not in pre_normalize:
             messages = f"\n----------------------------------\n" \
-            + "({key}) ---> {value} \n" \
-            + "Please review: <@{612976675583688710}>\n"
+            + f"({key}) ---> {value} \n" \
+            + f"Please review: <@{612976675583688710}>\n"
 
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)
 
@@ -154,7 +199,7 @@ def handle_notion_status_blocked(response):
 
     new_normalize = notion.data_normalize_by_status(response, "Blocked")
 
-    path_file = r'..\storage\blocked.pickle'
+    path_file = r'.\storage\blocked.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
@@ -169,7 +214,7 @@ def handle_notion_status_blocked(response):
     for key, value in new_normalize.items():
         if key not in pre_normalize:
             messages = f"\n----------------------------------\n" \
-            + "({key}) ---> {value} \n" \
+            + f"({key}) ---> {value} \n" \
             + "Oh my god. Help me!!!\n"
 
             send_message_to_discord(response, messages, credentials.WEBHOOK_TOKEN_DISCORD)

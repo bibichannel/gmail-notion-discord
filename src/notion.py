@@ -1,6 +1,5 @@
 import requests
 import random
-import pickle
 
 class Notion:
     base_url = "https://api.notion.com/v1/databases/"
@@ -38,18 +37,7 @@ class Notion:
             results.extend(data["results"])
 
         return results
-    
-    def save_data_to_file(self, filePath, object):
-        with open(filePath, 'wb') as f:
-            pickle.dump(object, f) 
-        print("Save successed")
-
-    def get_data_from_file(self, filePath):
-        with open(filePath, 'rb') as f:
-            object = pickle.load(f)
-        print("Get successed")    
-        return object
-        
+   
     def dictionary_decoder(self, response):
         return [i for i in response]
 
@@ -67,15 +55,6 @@ class PropertiesNotion(Notion):
         self.link = ""
         self.owner = ""
         self.status = ""
-
-    def __del__(self):
-        self.assign = []
-        self.ticket = ""
-        self.note = ""
-        self.link = ""
-        self.owner = ""
-        self.status = ""
-        print("Delete object successed")
 
     def check_ticket_assgin(self, response, ticket):
 
@@ -103,7 +82,7 @@ class PropertiesNotion(Notion):
 
                 return True
         return False
-        
+    
 # --------------------------------------------------------------
 
 def data_normalize_by_status(response, status_name):
@@ -122,5 +101,3 @@ def data_normalize_by_status(response, status_name):
             continue
     
     return new_data_dict
-
-query = {"filter": {}}
