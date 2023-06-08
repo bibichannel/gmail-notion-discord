@@ -109,6 +109,3 @@ def mark_as_read(services, message_id):
         print(f"Message {message_id} marked as read.")
     except Exception as e:
         print(f"An error occurred: {e}")
-
-
-

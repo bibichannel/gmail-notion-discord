@@ -84,7 +84,7 @@ class PropertiesNotion(Notion):
         return False
     
 # --------------------------------------------------------------
-
+# data noramilize to dict: {<ticket>:<status>}
 def data_normalize_by_status(response, status_name):
     new_data_dict = {}
 
