@@ -23,6 +23,9 @@ class Notion:
 
         payload = {"page_size": page_size}
         response = requests.post(url, data=payload, headers=self.header)
+        if response.status_code != 200:
+            print(f"Status code {response.status_code}")
+            return None
 
         data = response.json()
 
@@ -107,7 +110,7 @@ class TaskPageProperties():
             self.feature = [i['id'] for i in pages['properties']['Feature']['relation']]
         
         if pages['properties']['Parent-task']['relation']:
-            self.parent_task = pages['properties']['Parent-task']['relation'][0]['id']
+            self.parent_task = [i['id'] for i in pages['properties']['Parent-task']['relation']]
         
         if pages['properties']['Sub-tasks']['relation']:
             self.sub_tasks = [i['id'] for i in pages['properties']['Sub-tasks']['relation']]
@@ -115,16 +118,7 @@ class TaskPageProperties():
         if pages['properties']['Assignee']['people']:
             self.assignee = [i['person']['email'] for i in pages['properties']['Assignee']['people']]
         
-        
-    def check_ticket_assgin(self, ticket):
-
-        if ticket in self.task_name:
-            return True
-        return False
-    
-
 class FeaturePageProperties():
-
     def __init__(self):
 
         '''['Project name', 'Owner', 'Status', 'Completion', 
@@ -171,12 +165,12 @@ class FeaturePageProperties():
 
 # --------------------------------------------------------------
 # data noramilize to dict: {<ticket>:<status>}
-def data_normalize_by_status(response, status_name):
+def data_normalize_by_status(response_task, status_name):
     new_data_dict = {}
 
-    for element in response:
-        if element["properties"]["Ticket"]["title"] != []:
-            ticket = element["properties"]["Ticket"]["title"][0]["plain_text"]
+    for element in response_task:
+        if element["properties"]["Task name"]["title"] != []:
+            ticket = element["properties"]["Task name"]["title"][0]["plain_text"]
         else:
             continue
 
@@ -187,3 +181,4 @@ def data_normalize_by_status(response, status_name):
             continue
     
     return new_data_dict
+
