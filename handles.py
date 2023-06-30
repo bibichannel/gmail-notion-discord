@@ -6,8 +6,11 @@ import credentials
 import time
 
 import src.notion as notion
+import src.myJira as myJira
 import src.gmail as gmail
-from src.notion import Notion, TaskPageProperties, FeaturePageProperties
+from src.myJira import Jira
+from src.notion import TaskPageProperties, FeaturePageProperties, Comments, CommentProperties, Pages
+from datetime import datetime, timedelta
 
 def get_id_member_in_directories(username):
     user_dict = dictionaries.user_dict
@@ -117,22 +120,109 @@ def get_data_from_file(filePath):
     print("Get successed")    
     return object
 
-def create_page(data: dict, DATABASE_ID, NOTION_TOKEN):
-    create_url = "https://api.notion.com/v1/pages"
+def create_page(ticket, summary, piority):
+    pages = Pages(credentials.DATABASE_ID_NOTION_TASK, credentials.NOTION_API_KEY)
 
-    headers = {
-        "Authorization": NOTION_TOKEN,
-        "Notion-Version": "2022-06-28"
+    if not summary:
+        summary = ""
+
+    if not piority:
+        piority = "High"
+    elif str(piority) == "Highest":
+        piority = "High"
+    elif str(piority) == "Lowest":
+        piority = "Low"
+
+    data = {
+        "Task name": {"title": [{ "text": {"content": ticket}}]},
+        'URL': {'url': f"https://astrolab1.atlassian.net/browse/{ticket}"},
+        "Summary": {"rich_text":[{ "text": { "content": summary}}]},
+        "Priority": {"select": {"name": piority}}
+    }
+
+    res = pages.create_page(data)
+    return res
+
+def update_page_status(page_id, status):
+    pages = Pages(credentials.DATABASE_ID_NOTION_TASK, credentials.NOTION_API_KEY)
+    if not status:
+        return None
+    
+    if status.upper() == "In Progress".upper():
+        data = {
+            "Status": {"status":{"name": "In Progress" }},
+            "JIRA Status": {"status":{"name": "In progress" }}
         }
+        res = pages.update_page(page_id, data)
+        return res
+    elif status.upper()  == "waiting for pr review".upper():
+        data = {
+            "JIRA Status": {"status":{"name": "Waiting For PR Review" }}
+        }
+        res = pages.update_page(page_id, data)
+        return res
+    elif status.upper()  == "Waiting for QA".upper():
+        data = {
+            "JIRA Status": {"status":{"name": "Waiting for QA" }}
+        }
+        res = pages.update_page(page_id, data)
+        return res
+    else:
+        return None
+  
+def compare_time(time_series, range_time):
+    # Compare time in previous range_time minutes
 
-    payload = {"parent": {"database_id": DATABASE_ID}, "properties": data}
+    time_now = datetime.utcnow()
+    ten_minutes_ago = time_now - timedelta(minutes=range_time)
 
-    res = requests.post(create_url, headers=headers, json=payload)
-    print(f"Status code: {res.status_code}")
+    print(f"Ten minutes ago: {ten_minutes_ago}")
+    print(f"Time comment   : {time_series}")
+    print(f"Time now       : {time_now}")
 
-    return res.json()
+    if str(ten_minutes_ago) <= str(time_series) <= str(time_now):
+        return True
+    else:
+        return False
 
-def handle_notification_from_email(response_feature, respone_task):
+def gen_messages_for_comment_jira(jira: object, issue: object):
+    jira_latest_comment = jira.get_latest_comment(issue)
+    messages = ''
+    if jira_latest_comment:
+        time_series_jira = myJira.reformat_time_series(jira_latest_comment.created)
+        if compare_time(time_series_jira, 10):
+            messages = f"**{jira_latest_comment.author}** just commented on JIRA\n"
+    return messages
+
+def gen_messages_for_history_jira(jira: object, issue: object):
+    jira_latest_history = jira.get_latest_history(issue)
+    messages= ''
+    if jira_latest_history:
+        time_series_jira = myJira.reformat_time_series(jira_latest_history.created)
+        if compare_time(time_series_jira, 10):
+            messages= f"**{jira_latest_history.author}** has just changed "
+            for item in jira_latest_history.items:
+                if item.field == "description":
+                    messages += "`description`\n"
+                else:
+                    messages += f"`{item.field}` from {item.fromString} -> {item.toString}\n"  
+    return messages
+
+def gen_messages_for_comment_notion(page_id):
+    commnets = Comments(credentials.NOTION_API_KEY)
+    notion_comments = commnets.get_comments(page_id)
+    notion_comment_properties = CommentProperties()
+    notion_comment_properties.get_data(commnets.get_latest_comment(notion_comments))
+
+    messages = ''
+    if notion_comment_properties.last_edited_time is not None:
+        time_series_jira = notion.reformat_time_series(notion_comment_properties.last_edited_time)
+        if compare_time(time_series_jira, 5):
+            messages = "**Someone** just commented on Notion\n"
+    return messages
+
+
+def handle_notification_from_email(response_feature, respone_task, jira: Jira ):
     print("Handles notification from email...")
 
     # Gmail
@@ -148,10 +238,15 @@ def handle_notification_from_email(response_feature, respone_task):
     for messsage in message_list_reconstruct:
         subject =  messsage['subject']
         ticket =  gmail.get_ticket(subject)
-        
+  
         if ticket is not None:
             print("-----------------------------")  
             print(ticket)
+
+            # Handle in jira project
+            issue = jira.get_issue(ticket)
+            messages_for_comment_jira = gen_messages_for_comment_jira(jira, issue)
+            messages_for_history_jira = gen_messages_for_history_jira(jira, issue)
 
             gmail.move_to_label(services, messsage['id'], credentials.NAME_LABEL_GMAIL)
             gmail.mark_as_read(services, messsage['id'])
@@ -160,10 +255,19 @@ def handle_notification_from_email(response_feature, respone_task):
 
             object = check_ticket(respone_task, ticket)
             if object:
+                # synchronized status from jira to notion
+                print("Synchronous processing...")
+                synch_status = update_page_status(object.page_id ,str(issue.fields.status))
+                if synch_status:
+                    print("Synchronous successed")
+                else:
+                    print("Nothing to sync")
+
                 feature = get_feature(response_feature, object.feature)
                 parent_task = get_tasks(respone_task, object.parent_task)
                 sub_tasks = get_tasks(respone_task, object.sub_tasks)
 
+                messages_for_comment_notion =  gen_messages_for_comment_notion(object.page_id)
                 messages_feature = gen_messages_for_feature(feature)
                 messages_parent_task = gen_messages_for_parent_task(parent_task)
                 messages_sub_tasks = gen_messages_for_sub_tasks(sub_tasks)
@@ -171,6 +275,9 @@ def handle_notification_from_email(response_feature, respone_task):
                 message_metion_owner = gen_messages_for_mention_user([object.owner])
 
                 messages = f"\n----------------------------------\n" \
+                + f"{messages_for_comment_jira}" \
+                + f"{messages_for_history_jira}" \
+                + f"{messages_for_comment_notion}" \
                 + f"{messages_feature}" \
                 + f"**[{object.task_name}]** " \
                 + f"- `{object.status}`" \
@@ -189,14 +296,11 @@ def handle_notification_from_email(response_feature, respone_task):
                 if ticket in list_ticket:
                     continue
 
-                # Create payload to add item into notion database
-                data = {
-                    "Task name": {"title": [{ "text": {"content": ticket}}]},
-                    'URL': {'url': f"https://astrolab1.atlassian.net/browse/{ticket}"}
-                }
                 # Create new page for notion
                 print("Add item to database notion")
-                res = create_page(data, credentials.DATABASE_ID_NOTION_TASK, credentials.NOTION_API_KEY)
+                res = create_page(ticket, 
+                                  str(issue.fields.summary), 
+                                  str(issue.fields.priority))
 
                 if 400 not in res.values():
                     # Create message to sent to discord
@@ -228,7 +332,17 @@ def handle_notification_from_email(response_feature, respone_task):
     
     print("Sent message success!\n")
 
-def handle_in_progress_status(response_task):
+def check_exist_status_file(response_task, path_status_file):
+    if not os.path.exists(path_status_file):
+        print("File status.pickle not exist. Processcing save data to file")
+        new_normalize = notion.data_normalize_by_status(response_task)
+        save_data_to_file(path_status_file, new_normalize)
+
+def save_latest_data_to_status_file(response_task, path_status_file):
+    new_normalize = notion.data_normalize_by_status(response_task)
+    save_data_to_file(path_status_file, new_normalize)
+
+def handle_in_progress_status(response_task, path_status_file):
     print("Processing notification from 'In progress' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response_task, "In Progress")
@@ -242,12 +356,16 @@ def handle_in_progress_status(response_task):
 
     # Get data from file
     pre_normalize = get_data_from_file(path_file)
+    all_ticket_status= get_data_from_file(path_status_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
+            object = check_ticket(response_task, key)
+            messages_for_comment_notion =  gen_messages_for_comment_notion(object.page_id)
             messages = f"\n----------------------------------\n" \
-            + f"**({key})** ---> {value} \n" \
+            + f"{messages_for_comment_notion}" \
+            + f"**({key})**: {all_ticket_status[key]} ---> {value} \n" \
             + "Have a good time at work!\n"
 
             send_message_to_discord(messages, credentials.WEBHOOK_TOKEN_DISCORD)
@@ -256,27 +374,31 @@ def handle_in_progress_status(response_task):
     save_data_to_file(path_file, new_normalize)
    
 
-def handle_waiting_for_pr_review_status(response_task):
+def handle_waiting_for_pr_review_status(response_task, path_status_file):
     print("Processing notification from 'Watting for PR Review' status of notion...")
 
     # Get data from notion database
-    new_normalize = notion.data_normalize_by_status(response_task, "Waiting For Review")
-    path_file = r'.\storage\waiting_for_pr_review.pickle'
+    new_normalize = notion.data_normalize_by_status(response_task, "Code Review")
+    path_file = r'.\storage\code_review.pickle'
 
     # Check file exist
     if not os.path.exists(path_file):
-        print("File waiting_for_pr_review.pickle not exist. Processcing save data to file")
+        print("File code_review.pickle not exist. Processcing save data to file")
         save_data_to_file(path_file, new_normalize)
         return True
 
     # Get data from file
     pre_normalize = get_data_from_file(path_file)
+    all_ticket_status= get_data_from_file(path_status_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
+            object = check_ticket(response_task, key)
+            messages_for_comment_notion =  gen_messages_for_comment_notion(object.page_id)
             messages = f"\n----------------------------------\n" \
-            + f"**({key})** ---> {value} \n" \
+            + f"{messages_for_comment_notion}" \
+            + f"**({key})**: {all_ticket_status[key]}  ---> {value} \n" \
             + f"Please review: <@{922319155070378045}>\n"
 
             send_message_to_discord(messages, credentials.WEBHOOK_TOKEN_DISCORD)
@@ -284,7 +406,7 @@ def handle_waiting_for_pr_review_status(response_task):
     # Save data for again process 
     save_data_to_file(path_file, new_normalize)
 
-def handle_notion_status_blocked(response_task):
+def handle_notion_status_blocked(response_task, path_status_file):
     print("Processing notification from 'Blocked' status of notion...")
 
     new_normalize = notion.data_normalize_by_status(response_task, "Blocked")
@@ -299,12 +421,16 @@ def handle_notion_status_blocked(response_task):
 
     # Get data from file
     pre_normalize = get_data_from_file(path_file)
+    all_ticket_status= get_data_from_file(path_status_file)
 
     # Iterate over all elements of new_normalize
     for key, value in new_normalize.items():
         if key not in pre_normalize:
+            object = check_ticket(response_task, key)
+            messages_for_comment_notion =  gen_messages_for_comment_notion(object.page_id)
             messages = f"\n----------------------------------\n" \
-            + f"**({key})** ---> {value} \n" \
+            + f"{messages_for_comment_notion}" \
+            + f"**({key})**: {all_ticket_status[key]} ---> {value} \n" \
             + "Oh my god. Help me!!!\n"
 
             send_message_to_discord(messages, credentials.WEBHOOK_TOKEN_DISCORD)

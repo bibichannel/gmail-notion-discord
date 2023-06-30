@@ -1,14 +1,16 @@
 import requests
 import random
+from datetime import datetime
 
 class Notion:
     base_url = "https://api.notion.com/v1/databases/"
+    version = "2022-06-28"
 
     def __init__(self, database_id, key):
         self.database_id = database_id
         self.key = key
         self.header = {"Authorization": self.key,
-                       "Notion-Version": "2022-06-28"}
+                       "Notion-Version": self.version}
 
     def get(self):
         response = requests.get(self.base_url + self.database_id, headers=self.header)
@@ -39,7 +41,7 @@ class Notion:
       
     def dictionary_decoder(self, response):
         return [i for i in response]
-
+    
 # ------------------------------------------------------------------------
 
 class TaskPageProperties():
@@ -120,7 +122,6 @@ class TaskPageProperties():
         
 class FeaturePageProperties():
     def __init__(self):
-
         '''['Project name', 'Owner', 'Status', 'Completion', 
         'Priority', 'Dates', 'Tasks', 'Is Blocking', 'Blocked By']'''
 
@@ -162,10 +163,74 @@ class FeaturePageProperties():
         if pages['properties']['Blocked By']['relation']:
             self.block_by = [i['id'] for i in pages['properties']['Blocked By']['relation']]
 
+class Comments():
+    version = "2022-06-28"
+
+    def __init__(self, key):
+        self.key = key
+        self.header = {"Authorization": self.key,
+                       "Notion-Version": self.version}
+
+    def get_comments(self, page_id):
+        endpoint = "https://api.notion.com/v1/comments?block_id={page_id}"
+        response = requests.get(endpoint.format(page_id=page_id), headers=self.header)
+        data = response.json()
+        data = data['results']
+        return data
+    
+    def get_latest_comment(self, data):
+        if data:
+            data.sort(key=lambda x: x['last_edited_time'], reverse=True)
+            latest_comment = data[0]
+            return latest_comment # return dictionary have latest last_edited_time
+
+class CommentProperties():
+    def __init__(self):
+        self.last_edited_time = None
+        self.created_by = None
+        self.content = None
+    
+    def get_data(self, comment_obj):
+        if comment_obj:
+            self.content = comment_obj['rich_text'][0]['plain_text']
+            self.created_by = comment_obj['created_by']['id']
+            self.last_edited_time = comment_obj['last_edited_time']
+
+
+class Pages():
+    base_url = "https://api.notion.com/v1/pages"
+    version = "2022-06-28"
+
+    def __init__(self, database_id, notion_api_key):
+        self.database_id = database_id
+        self.notion_api_key = notion_api_key
+        self.header = {"Authorization": self.notion_api_key,
+                       "Notion-Version": self.version}
+
+    def create_page(self, data):
+        payload = {"parent": {"database_id": self.database_id}, "properties": data}
+        res = requests.post(self.base_url, headers=self.header, json=payload)
+        
+        print(f"Status code: {res.status_code}")
+        if res.status_code != 200:
+            print(res.json()['message'])
+
+        return res.json()
+
+    def update_page(self, page_id, data):
+        url = f"{self.base_url}/{page_id}"
+        payload = {"properties": data}
+        res = requests.patch(url, headers=self.header, json=payload)
+
+        print(f"Status code: {res.status_code}")
+        if res.status_code != 200:
+            print(res.json()['message'])
+
+        return res.json()
 
 # --------------------------------------------------------------
 # data noramilize to dict: {<ticket>:<status>}
-def data_normalize_by_status(response_task, status_name):
+def data_normalize_by_status(response_task, status_name=None):
     new_data_dict = {}
 
     for element in response_task:
@@ -175,10 +240,18 @@ def data_normalize_by_status(response_task, status_name):
             continue
 
         if element["properties"]["Status"]["status"] is not None:
-            if status_name in element["properties"]["Status"]["status"]["name"]:
+            if status_name is None:
+                new_data_dict[ticket] = element["properties"]["Status"]["status"]["name"]
+            elif status_name in element["properties"]["Status"]["status"]["name"]:
                 new_data_dict[ticket] = element["properties"]["Status"]["status"]["name"]
         else:
             continue
     
     return new_data_dict
 
+def reformat_time_series(time_series):
+    # Example "2023-06-16T03:50:00.000Z"
+
+    # Reformat time series
+    time = datetime.fromisoformat(time_series.replace('Z', ''))
+    return time
