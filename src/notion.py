@@ -122,6 +122,7 @@ class TaskPageProperties():
         
 class FeaturePageProperties():
     def __init__(self):
+
         '''['Project name', 'Owner', 'Status', 'Completion', 
         'Priority', 'Dates', 'Tasks', 'Is Blocking', 'Blocked By']'''
 
@@ -207,10 +208,13 @@ class Pages():
         self.header = {"Authorization": self.notion_api_key,
                        "Notion-Version": self.version}
 
-    def create_page(self, data):
-        payload = {"parent": {"database_id": self.database_id}, "properties": data}
-        res = requests.post(self.base_url, headers=self.header, json=payload)
+    def create_page(self, properties_data, children_data=None):
+        if children_data:
+            payload = {"parent": {"database_id": self.database_id}, "properties": properties_data, "children": children_data}
+        else:
+            payload = {"parent": {"database_id": self.database_id}, "properties": properties_data}
         
+        res = requests.post(self.base_url, headers=self.header, json=payload)
         print(f"Status code: {res.status_code}")
         if res.status_code != 200:
             print(res.json()['message'])
@@ -227,7 +231,7 @@ class Pages():
             print(res.json()['message'])
 
         return res.json()
-
+    
 # --------------------------------------------------------------
 # data noramilize to dict: {<ticket>:<status>}
 def data_normalize_by_status(response_task, status_name=None):
@@ -250,7 +254,7 @@ def data_normalize_by_status(response_task, status_name=None):
     return new_data_dict
 
 def reformat_time_series(time_series):
-    # Example "2023-06-16T03:50:00.000Z"
+    # Example "2023-06-16T03:50:00.000Z" -> "2023-06-16 03:50:00.000"
 
     # Reformat time series
     time = datetime.fromisoformat(time_series.replace('Z', ''))

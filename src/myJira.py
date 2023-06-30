@@ -30,7 +30,7 @@ class Jira():
             return None
 
 def reformat_time_series(time_series):
-    # example: 2023-06-19T16:47:06.138+0900
+    # example: "2023-06-19T16:47:06.138+0900" -> "2023-06-19 07:47:06.138000"
 
     time_obj = datetime.strptime(time_series[:-5], '%Y-%m-%dT%H:%M:%S.%f')
 
